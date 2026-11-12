@@ -5,75 +5,80 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
 
-    // Get request parameters
     const termCode = searchParams.get("termCode") || "202730";
     const subjectCode = searchParams.get("subjectCode") || "ECE";
     const campusCode = searchParams.get("campusCode") || "MAN";
 
-    // Common UH API request headers
     const headers = {
       Accept: "*/*",
       Referer: `https://www.sis.hawaii.edu:9350/crseavail/${termCode}/${campusCode}/${subjectCode}`,
       "X-Recaptcha-Token": "undefined",
     };
 
-    // Build course description API URL
-    const courseUrl = new URL(
-      "https://www.sis.hawaii.edu:9350/crseavail/api/course-desc"
+    // Create the three API URLs
+    const endpoints = [
+      "course-desc",
+      "base-section",
+      "courses",
+    ];
+
+    const urls = endpoints.map((endpoint) => {
+      const url = new URL(
+        `https://www.sis.hawaii.edu:9350/crseavail/api/${endpoint}`
+      );
+
+      url.searchParams.set("termCode", termCode);
+      url.searchParams.set("subjectCode", subjectCode);
+      url.searchParams.set("campusCode", campusCode);
+
+      return url.toString();
+    });
+
+    // Fetch all three endpoints
+    const responses = await Promise.all(
+      urls.map((url) =>
+        fetch(url, {
+          method: "GET",
+          headers,
+          cache: "no-store",
+        })
+      )
     );
 
-    courseUrl.searchParams.set("termCode", termCode);
-    courseUrl.searchParams.set("subjectCode", subjectCode);
-    courseUrl.searchParams.set("campusCode", campusCode);
-
-    // Build instructor information API URL
-    const instructorUrl = new URL(
-      "https://www.sis.hawaii.edu:9350/crseavail/api/base-section"
-    );
-
-    instructorUrl.searchParams.set("termCode", termCode);
-    instructorUrl.searchParams.set("subjectCode", subjectCode);
-    instructorUrl.searchParams.set("campusCode", campusCode);
-
-    // Fetch both APIs at the same time
-    const [courseResponse, instructorResponse] = await Promise.all([
-      fetch(courseUrl.toString(), {
-        method: "GET",
-        headers,
-        cache: "no-store",
-      }),
-      fetch(instructorUrl.toString(), {
-        method: "GET",
-        headers,
-        cache: "no-store",
-      }),
-    ]);
-
-    // Check for errors
-    if (!courseResponse.ok) {
-      throw new Error(
-        `Course API failed: ${courseResponse.status}`
-      );
-    }
-
-    if (!instructorResponse.ok) {
-      throw new Error(
-        `Instructor API failed: ${instructorResponse.status}`
-      );
+    // Check for failed requests
+    for (const response of responses) {
+      if (!response.ok) {
+        throw new Error(`UH API failed: ${response.status}`);
+      }
     }
 
     // Convert responses to JSON
-    const courseData = await courseResponse.json();
-    const instructorData = await instructorResponse.json();
+    const [descriptionData, instructorData, courseData] =
+      await Promise.all(responses.map((response) => response.json()));
 
-    // Make sure the responses are arrays
-    const courses = Array.isArray(courseData)
-      ? courseData
-      : [courseData];
+    // Ensure all responses are arrays
+    const descriptions = Array.isArray(descriptionData)
+      ? descriptionData
+      : [descriptionData];
 
     const instructors = Array.isArray(instructorData)
       ? instructorData
       : [instructorData];
+
+    const courseSections = Array.isArray(courseData)
+      ? courseData
+      : [courseData];
+
+    // Organize descriptions by CRN
+    const descriptionMap = new Map();
+
+    for (const item of descriptions) {
+      const crn = item.ssbsectCrn1 || item.ssbsectCrn;
+
+      if (crn) {
+        descriptionMap.set(crn, item);
+      }
+    }
 
     // Organize instructors by CRN
     const instructorMap = new Map();
@@ -83,41 +88,48 @@ export async function GET(request: Request) {
 
       if (!crn) continue;
 
-      const firstName = instructor.spridenFirstName || "";
-      const lastName = instructor.spridenLastName || "";
+      const name = [
+        instructor.spridenFirstName,
+        instructor.spridenLastName,
+      ]
+        .filter(Boolean)
+        .join(" ");
 
-      const fullName = `${firstName} ${lastName}`.trim();
+      if (!name) continue;
 
       if (!instructorMap.has(crn)) {
         instructorMap.set(crn, []);
       }
 
+      const existing = instructorMap.get(crn);
+
       if (
-        fullName &&
-        !instructorMap.get(crn).some(
-          (existing: { name: string }) =>
-            existing.name === fullName
+        !existing.some(
+          (person: { name: string; email: string | null }) =>
+            person.name === name
         )
       ) {
-        instructorMap.get(crn).push({
-          name: fullName,
+        existing.push({
+          name,
           email: instructor.goremalEmailAddress || null,
         });
       }
     }
 
-    // Combine course and instructor information
-    const combinedCourses = courses.map((course) => {
-      const crn =
-        course.ssbsectCrn1 || course.ssbsectCrn;
+    // Combine all information using CRN
+    const combinedCourses = courseSections.map((section) => {
+      const crn = section.ssbsectCrn1 || section.ssbsectCrn;
+
+      const description = descriptionMap.get(crn) || {};
 
       return {
-        ...course,
+        ...section,
+        title: section.title || description.title || "",
+        textNarrative: description.textNarrative || "",
         instructors: instructorMap.get(crn) || [],
       };
     });
 
-    // Return combined information
     return NextResponse.json(combinedCourses);
 
   } catch (error) {

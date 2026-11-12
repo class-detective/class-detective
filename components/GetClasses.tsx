@@ -8,6 +8,19 @@ interface Instructor {
   email?: string | null;
 }
 
+interface CourseAPIResponse {
+  subjCode: string;
+  crseNumb?: string;
+  ssbsectCrseNumb1?: string;
+  textNarrative?: string;
+  title?: string;
+  ssbsectCrn1?: string;
+  ssbsectCrn?: string;
+  ssbsectSeqNumb1?: string;
+  ssbsectSeqNumb?: string;
+  instructors?: Instructor[];
+}
+
 interface Course {
   key: string;
   description: string;
@@ -32,8 +45,8 @@ export default function GetClasses() {
 
         const data = await response.json();
 
-        const courseList: Course[] = data
-          .map((item: any) => {
+        const courseList: Course[] = (data as CourseAPIResponse[])
+          .map((item) => {
             const subject = item.subjCode;
 
             const number = (
@@ -54,7 +67,7 @@ export default function GetClasses() {
               instructors: item.instructors || [],
             };
           })
-          .filter((course: Course | null): course is Course => course !== null);
+          .filter((course): course is Course => course !== null);
 
         // Sort by course number, then section
         courseList.sort((a, b) => {
@@ -112,7 +125,8 @@ export default function GetClasses() {
                   .join(", ")
               : "Not available"}
           </p>
-          <br></br>
+
+          <br />
         </div>
       ))}
     </div>
