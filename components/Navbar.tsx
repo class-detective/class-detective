@@ -24,7 +24,7 @@ export default function Navbar() {
       >
         <Link href="/" className="flex shrink-0 items-center gap-3" aria-label="Class Detective home">
           <Image
-            src="/images/white alt logo.png"
+            src="/images/logo-white.png"
             alt=""
             width={48}
             height={48}
