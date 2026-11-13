@@ -1,6 +1,63 @@
 
 import { NextResponse } from "next/server";
 
+type ApiRecord = Record<string, unknown>;
+
+function toRecords(data: unknown): ApiRecord[] {
+  if (Array.isArray(data)) {
+    return data as ApiRecord[];
+  }
+
+  if (data && typeof data === "object") {
+    return [data as ApiRecord];
+  }
+
+  return [];
+}
+
+function getString(
+  item: ApiRecord,
+  ...fields: string[]
+): string {
+  for (const field of fields) {
+    const value = item[field];
+
+    if (value !== null && value !== undefined && value !== "") {
+      return String(value);
+    }
+  }
+
+  return "";
+}
+
+function formatTime(time: string): string {
+  if (!time) return "";
+
+  const normalized = time.padStart(4, "0");
+  const hours = Number(normalized.slice(0, 2));
+  const minutes = normalized.slice(2, 4);
+
+  const period = hours >= 12 ? "PM" : "AM";
+  const displayHours = hours % 12 || 12;
+
+  return `${displayHours}:${minutes} ${period}`;
+}
+
+function getDays(meeting: ApiRecord): string {
+  return [
+    meeting.monDay,
+    meeting.tueDay,
+    meeting.wedDay,
+    meeting.thuDay,
+    meeting.friDay,
+    meeting.satDay,
+    meeting.sunDay,
+  ]
+    .filter(Boolean)
+    .map(String)
+    .join("");
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -15,118 +72,198 @@ export async function GET(request: Request) {
       "X-Recaptcha-Token": "undefined",
     };
 
-    // Create the three API URLs
     const endpoints = [
+      "section-counts",
+      "courses",
       "course-desc",
       "base-section",
-      "courses",
+      "meetings",
+      "section-attrib",
     ];
 
-    const urls = endpoints.map((endpoint) => {
-      const url = new URL(
-        `https://www.sis.hawaii.edu:9350/crseavail/api/${endpoint}`
-      );
+    // Request all six endpoints simultaneously.
+    const results = await Promise.all(
+      endpoints.map(async (endpoint) => {
+        const url = new URL(
+          `https://www.sis.hawaii.edu:9350/crseavail/api/${endpoint}`
+        );
 
-      url.searchParams.set("termCode", termCode);
-      url.searchParams.set("subjectCode", subjectCode);
-      url.searchParams.set("campusCode", campusCode);
+        url.searchParams.set("termCode", termCode);
+        url.searchParams.set("subjectCode", subjectCode);
+        url.searchParams.set("campusCode", campusCode);
 
-      return url.toString();
-    });
-
-    // Fetch all three endpoints
-    const responses = await Promise.all(
-      urls.map((url) =>
-        fetch(url, {
+        const response = await fetch(url.toString(), {
           method: "GET",
           headers,
           cache: "no-store",
-        })
-      )
+        });
+
+        if (!response.ok) {
+          throw new Error(
+            `${endpoint} failed with status ${response.status}`
+          );
+        }
+
+        return toRecords(await response.json());
+      })
     );
 
-    // Check for failed requests
-    for (const response of responses) {
-      if (!response.ok) {
-        throw new Error(`UH API failed: ${response.status}`);
-      }
+    const [
+      sectionData,
+      courseData,
+      descriptionData,
+      instructorData,
+      meetingData,
+      attributeData,
+    ] = results;
+
+    // Helper for finding records by CRN.
+    const getCrn = (item: ApiRecord) =>
+      getString(
+        item,
+        "crn",
+        "ssbsectCrn",
+        "ssbsectCrn1"
+      );
+
+    // Create lookup maps for information that belongs to one section.
+    const courseMap = new Map<string, ApiRecord>();
+    const descriptionMap = new Map<string, ApiRecord>();
+
+    for (const item of courseData) {
+      const crn = getCrn(item);
+      if (crn) courseMap.set(crn, item);
     }
 
-    // Convert responses to JSON
-    const [descriptionData, instructorData, courseData] =
-      await Promise.all(responses.map((response) => response.json()));
-
-    // Ensure all responses are arrays
-    const descriptions = Array.isArray(descriptionData)
-      ? descriptionData
-      : [descriptionData];
-
-    const instructors = Array.isArray(instructorData)
-      ? instructorData
-      : [instructorData];
-
-    const courseSections = Array.isArray(courseData)
-      ? courseData
-      : [courseData];
-
-    // Organize descriptions by CRN
-    const descriptionMap = new Map();
-
-    for (const item of descriptions) {
-      const crn = item.ssbsectCrn1 || item.ssbsectCrn;
-
-      if (crn) {
-        descriptionMap.set(crn, item);
-      }
+    for (const item of descriptionData) {
+      const crn = getCrn(item);
+      if (crn) descriptionMap.set(crn, item);
     }
 
-    // Organize instructors by CRN
-    const instructorMap = new Map();
+    // Group instructors by CRN.
+    const instructorMap = new Map<string, {
+      firstName: string;
+      lastName: string;
+      email: string | null;
+    }[]>();
 
-    for (const instructor of instructors) {
-      const crn = instructor.ssbsectCrn;
-
+    for (const item of instructorData) {
+      const crn = getCrn(item);
       if (!crn) continue;
 
-      const name = [
-        instructor.spridenFirstName,
-        instructor.spridenLastName,
-      ]
-        .filter(Boolean)
-        .join(" ");
+      const firstName = getString(item, "spridenFirstName");
+      const lastName = getString(item, "spridenLastName");
 
-      if (!name) continue;
+      if (!firstName && !lastName) continue;
 
-      if (!instructorMap.has(crn)) {
-        instructorMap.set(crn, []);
+      const instructor = {
+        firstName,
+        lastName,
+        email: getString(item, "goremalEmailAddress") || null,
+      };
+
+      const existing = instructorMap.get(crn) || [];
+
+      const alreadyExists = existing.some(
+        (person) =>
+          person.firstName === firstName &&
+          person.lastName === lastName
+      );
+
+      if (!alreadyExists) {
+        existing.push(instructor);
       }
 
-      const existing = instructorMap.get(crn);
-
-      if (
-        !existing.some(
-          (person: { name: string; email: string | null }) =>
-            person.name === name
-        )
-      ) {
-        existing.push({
-          name,
-          email: instructor.goremalEmailAddress || null,
-        });
-      }
+      instructorMap.set(crn, existing);
     }
 
-    // Combine all information using CRN
-    const combinedCourses = courseSections.map((section) => {
-      const crn = section.ssbsectCrn1 || section.ssbsectCrn;
+    // Group attributes by CRN.
+    const attributeMap = new Map<string, {
+      code: string;
+      description: string;
+    }[]>();
 
+    for (const item of attributeData) {
+      const crn = getCrn(item);
+      if (!crn) continue;
+
+      const code = getString(item, "attrCode", "code");
+      const description = getString(item, "desc");
+
+      const existing = attributeMap.get(crn) || [];
+
+      if (
+        code &&
+        !existing.some((attribute) => attribute.code === code)
+      ) {
+        existing.push({ code, description });
+      }
+
+      attributeMap.set(crn, existing);
+    }
+
+    // Group meetings by CRN.
+    const meetingMap = new Map<string, {
+      days: string;
+      startTime: string;
+      endTime: string;
+      startDate: string;
+      endDate: string;
+      building: string;
+      room: string;
+      meetingType: string;
+    }[]>();
+
+    for (const item of meetingData) {
+      const crn = getCrn(item);
+      if (!crn) continue;
+
+      const meeting = {
+        days: getDays(item),
+        startTime: formatTime(getString(item, "beginTime")),
+        endTime: formatTime(getString(item, "endTime")),
+        startDate: getString(item, "startDate"),
+        endDate: getString(item, "endDate"),
+        building: getString(item, "bldgCode"),
+        room: getString(item, "roomCode"),
+        meetingType: getString(item, "mtypCode"),
+      };
+
+      const existing = meetingMap.get(crn) || [];
+      existing.push(meeting);
+      meetingMap.set(crn, existing);
+    }
+
+    // Combine everything into one record per section.
+    const combinedCourses = sectionData.map((section) => {
+      const crn = getCrn(section);
+
+      const course = courseMap.get(crn) || {};
       const description = descriptionMap.get(crn) || {};
 
       return {
-        ...section,
-        title: section.title || description.title || "",
-        textNarrative: description.textNarrative || "",
+        subject: getString(section, "subjCode", "ssbsectSubjCode"),
+        courseNumber: getString(section, "crseNumb", "ssbsectCrseNumb"),
+        title: getString(course, "title"),
+        description: getString(description, "textNarrative"),
+
+        crn,
+        section: getString(section, "seqNumb", "ssbsectSeqNumb"),
+
+        credits:
+          section.creditHrs ??
+          section.totCreditHrs ??
+          null,
+
+        attributes: attributeMap.get(crn) || [],
         instructors: instructorMap.get(crn) || [],
+        meetings: meetingMap.get(crn) || [],
+
+        seatsAvailable: section.seatsAvail ?? null,
+        enrollment: section.enrl ?? null,
+        maximumEnrollment: section.maxEnrl ?? null,
+        waitlistAvailable: section.waitAvail ?? null,
+        waitlistCount: section.waitCount ?? null,
       };
     });
 
