@@ -1,9 +1,9 @@
 {
   "schemaVersion": "1.0",
   "student": {
-    "firstName": "Evan",
-    "lastName": "Morgan",
-    "studentId": "28912613"
+    "firstName": "John",
+    "lastName": "Doe",
+    "studentId": "77777777"
   },
   "institution": "All Campuses and Deg",
   "courses": [
