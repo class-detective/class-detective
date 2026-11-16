@@ -63,7 +63,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
 
     const termCode = searchParams.get("termCode") || "202730";
-    const subjectCode = searchParams.get("subjectCode") || "ECE";
+    const subjectCode = searchParams.get("subjectCode") || "ICS";
     const campusCode = searchParams.get("campusCode") || "MAN";
 
     const headers = {

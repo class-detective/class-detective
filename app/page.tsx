@@ -4,7 +4,13 @@
 import Image from "next/image";
 import Link from "next/link";
 import useCourses from "@/components/useCourses";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { parsePrerequisites } from "@/lib/prerequisiteParser";
+import {
+  checkEligibility,
+  type TranscriptCourse,
+  type EligibilityResult,
+} from "@/lib/eligibilityChecker";
 
 const features = [
   {
@@ -27,15 +33,149 @@ const features = [
 export default function Home() {
   const { courses, loading, error } = useCourses();
 
+  const [transcript, setTranscript] = useState<TranscriptCourse[] | null>(
+    null
+  );
+  const [transcriptLoading, setTranscriptLoading] = useState(true);
+  const [transcriptError, setTranscriptError] = useState("");
+
+  // Load the student's transcript.
   useEffect(() => {
-    if (!loading && !error) {
-      console.log("UH Courses:", courses);
+    async function loadTranscript() {
+      try {
+        const response = await fetch("/test-transcript.json");
+
+        if (!response.ok) {
+          throw new Error("Could not load transcript.");
+        }
+
+        const transcriptData = await response.json();
+
+        setTranscript(transcriptData.courses as TranscriptCourse[]);
+      } catch (err) {
+        setTranscriptError(
+          err instanceof Error
+            ? err.message
+            : "Something went wrong loading the transcript."
+        );
+      } finally {
+        setTranscriptLoading(false);
+      }
     }
 
+    loadTranscript();
+  }, []);
+
+  // Print course retrieval errors.
+  useEffect(() => {
     if (error) {
       console.error("Course retrieval error:", error);
     }
-  }, [courses, loading, error]);
+  }, [error]);
+
+  // Print transcript retrieval errors.
+  useEffect(() => {
+    if (transcriptError) {
+      console.error("Transcript retrieval error:", transcriptError);
+    }
+  }, [transcriptError]);
+
+  // Calculate eligibility and print the resulting JSON.
+  useEffect(() => {
+    if (
+      loading ||
+      transcriptLoading ||
+      !transcript ||
+      error ||
+      transcriptError
+    ) {
+      return;
+    }
+
+    if (courses.length === 0) {
+      console.warn("No UH courses were retrieved.");
+      return;
+    }
+
+    // Calculate eligibility once per unique course.
+    const eligibilityByCourse = new Map<string, EligibilityResult>();
+
+    for (const course of courses) {
+      const key = `${course.subject.toUpperCase()}-${course.courseNumber.toUpperCase()}`;
+
+      if (eligibilityByCourse.has(key)) {
+        continue;
+      }
+
+      const description = course.description || "";
+
+      const hasPrerequisites =
+        /\b(?:Pre|Prerequisite):/i.test(description);
+
+      let result: EligibilityResult;
+
+      if (!hasPrerequisites) {
+        result = {
+          status: "eligible",
+          reasons: ["No required prerequisite listed"],
+        };
+      } else {
+        const prerequisites = parsePrerequisites(course);
+
+        if (!prerequisites) {
+          result = {
+            status: "needs_review",
+            reasons: [
+              "The prerequisite description could not be interpreted automatically.",
+            ],
+          };
+        } else {
+          result = checkEligibility(prerequisites, transcript);
+        }
+      }
+
+      eligibilityByCourse.set(key, result);
+    }
+
+    // Preserve every original UH section and add eligibility.
+    const coursesWithEligibility = courses.map((course) => {
+      const key = `${course.subject.toUpperCase()}-${course.courseNumber.toUpperCase()}`;
+
+      return {
+        ...course,
+        eligibility: eligibilityByCourse.get(key)!,
+      };
+    });
+
+    // Create a separate list of courses needing manual review.
+    const needsReview = coursesWithEligibility.filter(
+      (course) => course.eligibility.status === "needs_review"
+    );
+
+    // Final JSON output.
+    const output = {
+      courses: coursesWithEligibility,
+      needsReview,
+    };
+
+    console.log(
+      "CLASS DETECTIVE: COURSE ELIGIBILITY JSON"
+    );
+
+    console.log(JSON.stringify(output, null, 2));
+
+    console.log("Course sections retrieved:", courses.length);
+    console.log("Unique courses evaluated:", eligibilityByCourse.size);
+    console.log("Courses needing review:", needsReview.length);
+
+  }, [
+    courses,
+    loading,
+    error,
+    transcript,
+    transcriptLoading,
+    transcriptError,
+  ]);
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col bg-[#0b3029] text-white">

@@ -76,7 +76,6 @@ export default function useCourses() {
         );
 
         setCourses(courseList);
-
       } catch (err) {
         setError(
           err instanceof Error
