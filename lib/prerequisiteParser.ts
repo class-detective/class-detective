@@ -34,87 +34,147 @@ interface CourseInfo {
   description: string;
 }
 
+function tokenize(text: string): string[] {
+  const pattern =
+    /\b(?:and|or|consent)\b|ANY_110_ALPHA|AGGREGATE_REQUIREMENT|JUNIOR_STANDING|SENIOR_STANDING|GRADUATE_STANDING|CONCURRENT|[A-Za-z]+\s*\d+[A-Za-z]?|\d+[A-Za-z]?|[A-Za-z_]+|[()]/gi;
+
+  return (text.match(pattern) || []).map((token) => token.trim());
+}
+
+function combine(
+  type: "AND" | "OR",
+  requirements: Prerequisite[]
+): Prerequisite {
+  if (requirements.length === 1) {
+    return requirements[0];
+  }
+
+  return { type, requirements };
+}
+
 export function parsePrerequisites(
   course: CourseInfo
 ): Prerequisite | null {
   const description = course.description;
 
-  if (!description) return null;
+  if (!description?.trim()) {
+    return null;
+  }
 
   // Find the prerequisite section.
+  // Stop at the final period, but allow punctuation inside the expression.
   const match = description.match(
-    /\b(?:Pre|Prerequisite):\s*([\s\S]*?)(?:\.|$)/i
+    /\b(?:Pre|Prerequisite):\s*([\s\S]*?)(?=\.\s|\.?$)/i
   );
 
-  // Find academic standing requirements that appear before
-  // the prerequisite section.
   const textBeforePrerequisites = match
-    ? description.slice(0, match.index)
+    ? description.slice(0, match.index ?? 0)
     : description;
 
-  const standingMatch = textBeforePrerequisites.match(
-    /\b(graduate|senior|junior)\s+standing(?:\s+or\s+higher)?\b/i
-  );
+  const prefixRequirements: Prerequisite[] = [];
 
-  let standingRequirement: Prerequisite | null = null;
+  // Detect standing requirements before the prerequisite section.
+  const standingRegex =
+    /\b(graduate|senior|junior)\s+standing(?:\s+or\s+higher)?\b/gi;
 
-  if (standingMatch) {
-    standingRequirement = {
+  let standingMatch: RegExpExecArray | null;
+
+  while ((standingMatch = standingRegex.exec(textBeforePrerequisites))) {
+    prefixRequirements.push({
       type: "STANDING",
       level: standingMatch[1].toUpperCase() as
         | "JUNIOR"
         | "SENIOR"
         | "GRADUATE",
-    };
+    });
   }
 
-  // No prerequisite section.
+  // Detect major restrictions without assuming a specific major.
+  const majorRegex =
+    /\b([A-Za-z][A-Za-z &'-]*?)\s+majors?\s+only\b/gi;
+
+  let majorMatch: RegExpExecArray | null;
+
+  while ((majorMatch = majorRegex.exec(textBeforePrerequisites))) {
+    prefixRequirements.push({
+      type: "REVIEW",
+      description: `${majorMatch[1].trim()} majors only`,
+    });
+  }
+
   if (!match) {
-    return standingRequirement;
+    return prefixRequirements.length > 0
+      ? combine("AND", prefixRequirements)
+      : null;
   }
 
   let prerequisiteText = match[1].trim();
 
-  // Recommended experience is not a required prerequisite.
+  // Recommended courses are not mandatory prerequisites.
   if (/^Recommended\s*:/i.test(prerequisiteText)) {
-    return standingRequirement || {
-      type: "NO_REQUIREMENT",
-    };
+    return prefixRequirements.length > 0
+      ? combine("AND", prefixRequirements)
+      : { type: "NO_REQUIREMENT" };
   }
 
-  // Normalize special UH prerequisite notation.
+  // Store aggregate requirement descriptions separately.
+  // This works with any subject code.
+  const aggregateDescriptions: string[] = [];
+
+  prerequisiteText = prerequisiteText.replace(
+    /\b(?:at\s+least\s+)?two\s+(\d{3})[- ]level\s+([A-Za-z]+)\s+(?:classes|courses)\b/gi,
+    (_fullMatch, level: string, subject: string) => {
+      aggregateDescriptions.push(
+        `At least two ${level}-level ${subject.toUpperCase()} classes`
+      );
+
+      return " AGGREGATE_REQUIREMENT ";
+    }
+  );
+
+  // Normalize square brackets and special phrases.
   prerequisiteText = prerequisiteText
-    .replace(
-      /\bany\s+110\s*\(\s*alpha\s*\)/gi,
-      "ANY_110_ALPHA"
-    )
     .replace(/\[/g, "(")
     .replace(/\]/g, ")")
-
-    // Mark the preceding parenthesized requirement as
-    // something that may be taken concurrently.
     .replace(
-      /\(\s*or\s+concurrent\s*\)/gi,
-      " CONCURRENT "
+      /\bany\s+110\s*\(\s*alpha\s*\)/gi,
+      " ANY_110_ALPHA "
     )
+    .replace(/\(\s*or\s+concurrent\s*\)/gi, " CONCURRENT ");
 
-    // Commas separate required groups unless followed by
-    // an explicit AND or OR.
+  // A semicolon followed by "or" represents ONE OR operator.
+  // Consume both the semicolon and the word "or".
+  prerequisiteText = prerequisiteText.replace(
+    /;\s*or\b/gi,
+    " OR "
+  );
+
+  // Remaining semicolons and commas separate AND requirements.
+  prerequisiteText = prerequisiteText
+    .replace(/;/g, " AND ")
     .replace(/,\s*(?=(?:and|or)\b)/gi, " ")
-    .replace(/,/g, " AND ")
+    .replace(/,/g, " AND ");
 
-    // Semicolons are treated as separators.
-    .replace(/;/g, " ");
+  // Convert standing phrases into single tokens.
+  prerequisiteText = prerequisiteText
+    .replace(
+      /\bjunior\s+standing(?:\s+or\s+higher)?\b/gi,
+      " JUNIOR_STANDING "
+    )
+    .replace(
+      /\bsenior\s+standing(?:\s+or\s+higher)?\b/gi,
+      " SENIOR_STANDING "
+    )
+    .replace(
+      /\bgraduate\s+standing(?:\s+or\s+higher)?\b/gi,
+      " GRADUATE_STANDING "
+    );
 
-  const tokens =
-    prerequisiteText.match(
-      /ANY_110_ALPHA|\b(?:and|or|consent|graduate\s+standing|junior\s+standing(?:\s+or\s+higher)?|senior\s+standing(?:\s+or\s+higher)?|concurrent)\b|[A-Za-z]+\s*\d+[A-Za-z]*|\d+[A-Za-z]*|[A-Za-z]+|[()]/gi
-    ) || [];
+  const tokens = tokenize(prerequisiteText);
 
   let position = 0;
-
-  // Default subject is the department of the course being evaluated.
-  let lastSubject = course.subject;
+  let lastSubject = course.subject.toUpperCase();
+  let aggregateIndex = 0;
 
   function parsePrimary(): Prerequisite {
     const token = tokens[position];
@@ -125,86 +185,90 @@ export function parsePrerequisites(
 
     let result: Prerequisite;
 
-    // Handle parentheses.
     if (token === "(") {
       position++;
 
-      // Save the subject before entering this group.
       const previousSubject = lastSubject;
 
       result = parseExpression();
 
       if (tokens[position] !== ")") {
-        throw new Error("Missing closing parenthesis.");
+        console.error("Parenthesis parsing details:", {
+          course: `${course.subject} ${course.courseNumber}`,
+          tokens,
+          position,
+          currentToken: tokens[position],
+          remainingTokens: tokens.slice(position),
+          prerequisiteText,
+        });
+
+        throw new Error(
+          `Expected closing parenthesis, found "${tokens[position] ?? "end of input"}"`
+        );
       }
 
       position++;
 
-      // Restore subject inheritance after leaving the group.
+      // Do not allow a subject inside a group to leak outside it.
       lastSubject = previousSubject;
     } else {
       position++;
 
       const lowerToken = token.toLowerCase();
 
-      // Instructor consent.
       if (lowerToken === "consent") {
         result = { type: "CONSENT" };
-      }
-
-      // Academic standing.
-      else if (
-        lowerToken === "graduate standing" ||
-        lowerToken === "junior standing" ||
-        lowerToken === "junior standing or higher" ||
-        lowerToken === "senior standing" ||
-        lowerToken === "senior standing or higher"
-      ) {
-        const level:
-          | "JUNIOR"
-          | "SENIOR"
-          | "GRADUATE" =
-          lowerToken.startsWith("graduate")
-            ? "GRADUATE"
-            : lowerToken.startsWith("senior")
-              ? "SENIOR"
-              : "JUNIOR";
-
+      } else if (lowerToken === "junior_standing") {
         result = {
           type: "STANDING",
-          level,
+          level: "JUNIOR",
         };
-      }
-
-      // Special notation that needs further interpretation.
-      else if (lowerToken === "any_110_alpha") {
+      } else if (lowerToken === "senior_standing") {
+        result = {
+          type: "STANDING",
+          level: "SENIOR",
+        };
+      } else if (lowerToken === "graduate_standing") {
+        result = {
+          type: "STANDING",
+          level: "GRADUATE",
+        };
+      } else if (lowerToken === "any_110_alpha") {
         result = {
           type: "REVIEW",
           description: "Any 110 (Alpha) course",
         };
-      }
-
-      // Course requirement.
-      else {
+      } else if (lowerToken === "aggregate_requirement") {
+        result = {
+          type: "REVIEW",
+          description:
+            aggregateDescriptions[aggregateIndex++] ??
+            "Aggregate course requirement",
+        };
+      } else {
         const courseMatch = token.match(
-          /^([A-Za-z]+)?\s*(\d+[A-Za-z]*)$/i
+          /^([A-Za-z]+)\s*(\d+[A-Za-z]?)$/i
+        );
+
+        const numberOnlyMatch = token.match(
+          /^(\d+[A-Za-z]?)$/i
         );
 
         if (courseMatch) {
-          const subject = courseMatch[1]?.toUpperCase();
-
-          if (subject) {
-            lastSubject = subject;
-          }
+          lastSubject = courseMatch[1].toUpperCase();
 
           result = {
             type: "COURSE",
             subject: lastSubject,
-            courseNumber: courseMatch[2],
+            courseNumber: courseMatch[2].toUpperCase(),
+          };
+        } else if (numberOnlyMatch) {
+          result = {
+            type: "COURSE",
+            subject: lastSubject,
+            courseNumber: numberOnlyMatch[1].toUpperCase(),
           };
         } else {
-          // Preserve unknown requirements instead of silently
-          // treating them as satisfied.
           result = {
             type: "REVIEW",
             description: token,
@@ -213,8 +277,7 @@ export function parsePrerequisites(
       }
     }
 
-    // Handle a concurrent-enrollment qualifier following
-    // a parenthesized prerequisite group.
+    // CONCURRENT applies to the immediately preceding course or group.
     if (tokens[position]?.toLowerCase() === "concurrent") {
       position++;
 
@@ -236,12 +299,7 @@ export function parsePrerequisites(
       requirements.push(parsePrimary());
     }
 
-    return requirements.length === 1
-      ? requirements[0]
-      : {
-          type: "AND",
-          requirements,
-        };
+    return combine("AND", requirements);
   }
 
   function parseExpression(): Prerequisite {
@@ -252,47 +310,45 @@ export function parsePrerequisites(
       requirements.push(parseAnd());
     }
 
-    return requirements.length === 1
-      ? requirements[0]
-      : {
-          type: "OR",
-          requirements,
-        };
+    return combine("OR", requirements);
   }
 
   try {
-    const result =
+    const parsedRequirement: Prerequisite =
       tokens.length > 0
         ? parseExpression()
-        : {
-            type: "NO_REQUIREMENT" as const,
-          };
+        : { type: "NO_REQUIREMENT" };
 
-    // If some words could not be interpreted, send the entire
-    // prerequisite description for manual review.
+    // Never silently accept an expression the parser did not understand.
     if (position !== tokens.length) {
+      console.error("Unparsed prerequisite tokens:", {
+        course: `${course.subject} ${course.courseNumber}`,
+        tokens,
+        position,
+        remainingTokens: tokens.slice(position),
+        prerequisiteText,
+      });
+
       return {
         type: "REVIEW",
         description: prerequisiteText,
       };
     }
 
-    // Combine standing requirements with course prerequisites.
-    if (standingRequirement) {
-      return {
-        type: "AND",
-        requirements: [standingRequirement, result],
-      };
+    if (prefixRequirements.length > 0) {
+      return combine("AND", [
+        ...prefixRequirements,
+        parsedRequirement,
+      ]);
     }
 
-    return result;
+    return parsedRequirement;
   } catch (error) {
     console.error(
       `Prerequisite parsing error for ${course.subject} ${course.courseNumber}:`,
       error
     );
 
-    // Return a review result instead of breaking the course search.
     return {
       type: "REVIEW",
       description: prerequisiteText,

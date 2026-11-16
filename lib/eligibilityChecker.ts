@@ -1,14 +1,13 @@
 
 import type { Prerequisite } from "./prerequisiteParser";
 
-// Possible eligibility results.
 export type EligibilityStatus =
   | "eligible"
   | "not_eligible"
   | "pending"
-  | "needs_review";
+  | "needs_review"
+  | "need_approval";
 
-// Transcript course format.
 export interface TranscriptCourse {
   subject: string;
   courseNumber: string;
@@ -16,13 +15,11 @@ export interface TranscriptCourse {
   status: string;
 }
 
-// Result returned by the eligibility checker.
 export interface EligibilityResult {
   status: EligibilityStatus;
   reasons: string[];
 }
 
-// Grades that satisfy the C-or-better requirement.
 const passingGrades = new Set([
   "A+",
   "A",
@@ -42,12 +39,14 @@ function normalizeCourseNumber(courseNumber: string): string {
   return courseNumber.trim().toUpperCase();
 }
 
-// Remove duplicate reasons while preserving their order.
+function normalizeStatus(status: string): string {
+  return status.trim().toLowerCase().replace(/[\s-]+/g, "_");
+}
+
 function uniqueReasons(reasons: string[]): string[] {
   return [...new Set(reasons)];
 }
 
-// Check whether a student has completed a particular course.
 function checkCourse(
   subject: string,
   courseNumber: string,
@@ -67,10 +66,9 @@ function checkCourse(
     };
   }
 
-  // A passing completed attempt satisfies the prerequisite.
   const passed = matchingCourses.some(
     (course) =>
-      course.status.toLowerCase() === "completed" &&
+      normalizeStatus(course.status) === "completed" &&
       course.grade !== null &&
       passingGrades.has(course.grade.trim().toUpperCase())
   );
@@ -82,9 +80,8 @@ function checkCourse(
     };
   }
 
-  // Check whether the course is currently being taken.
   const inProgress = matchingCourses.some(
-    (course) => course.status.toLowerCase() === "in_progress"
+    (course) => normalizeStatus(course.status) === "in_progress"
   );
 
   if (inProgress) {
@@ -94,10 +91,9 @@ function checkCourse(
     };
   }
 
-  // Check for completed courses without a passing grade.
   const unsuccessful = matchingCourses.some(
     (course) =>
-      course.status.toLowerCase() === "completed" &&
+      normalizeStatus(course.status) === "completed" &&
       course.grade !== null &&
       !passingGrades.has(course.grade.trim().toUpperCase())
   );
@@ -120,42 +116,53 @@ function checkCourse(
 }
 
 // Combine results for AND requirements.
-
+// Every requirement must be satisfied.
+//
+// Priority:
+// 1. not_eligible
+// 2. needs_review
+// 3. pending
+// 4. need_approval
+// 5. eligible
 function combineAnd(
   results: EligibilityResult[]
 ): EligibilityResult {
-  // A missing or failed required prerequisite takes priority.
+  const unresolvedResults = results.filter(
+    (result) => result.status !== "eligible"
+  );
+
   if (results.some((result) => result.status === "not_eligible")) {
     return {
       status: "not_eligible",
       reasons: uniqueReasons(
-        results
-          .filter((result) => result.status !== "eligible")
-          .flatMap((result) => result.reasons)
+        unresolvedResults.flatMap((result) => result.reasons)
       ),
     };
   }
 
-  // An in-progress prerequisite makes the overall result pending.
-  if (results.some((result) => result.status === "pending")) {
-    return {
-      status: "pending",
-      reasons: uniqueReasons(
-        results
-          .filter((result) => result.status !== "eligible")
-          .flatMap((result) => result.reasons)
-      ),
-    };
-  }
-
-  // Only use needs_review when no required course is missing or pending.
   if (results.some((result) => result.status === "needs_review")) {
     return {
       status: "needs_review",
       reasons: uniqueReasons(
-        results
-          .filter((result) => result.status !== "eligible")
-          .flatMap((result) => result.reasons)
+        unresolvedResults.flatMap((result) => result.reasons)
+      ),
+    };
+  }
+
+  if (results.some((result) => result.status === "pending")) {
+    return {
+      status: "pending",
+      reasons: uniqueReasons(
+        unresolvedResults.flatMap((result) => result.reasons)
+      ),
+    };
+  }
+
+  if (results.some((result) => result.status === "need_approval")) {
+    return {
+      status: "need_approval",
+      reasons: uniqueReasons(
+        unresolvedResults.flatMap((result) => result.reasons)
       ),
     };
   }
@@ -166,12 +173,14 @@ function combineAnd(
   };
 }
 
-
 // Combine results for OR requirements.
+// Only one alternative needs to be satisfied.
+//
+// An in-progress alternative can still satisfy the requirement.
+// Do not treat all alternatives as independently required courses.
 function combineOr(
   results: EligibilityResult[]
 ): EligibilityResult {
-  // Any satisfied alternative is enough.
   const eligible = results.find(
     (result) => result.status === "eligible"
   );
@@ -180,50 +189,110 @@ function combineOr(
     return eligible;
   }
 
-  // Collect reasons from every unsatisfied alternative.
-  const reasons = uniqueReasons(
-    results.flatMap((result) => result.reasons)
+  const pending = results.filter(
+    (result) => result.status === "pending"
   );
 
-  // An in-progress alternative could satisfy the requirement.
-  if (results.some((result) => result.status === "pending")) {
+  if (pending.length > 0) {
     return {
       status: "pending",
-      reasons,
+      reasons: uniqueReasons(
+        pending.flatMap((result) => result.reasons)
+      ),
     };
   }
 
-  // An uncertain alternative still requires manual review.
-  if (results.some((result) => result.status === "needs_review")) {
+  const needsReview = results.filter(
+    (result) => result.status === "needs_review"
+  );
+
+  if (needsReview.length > 0) {
     return {
       status: "needs_review",
-      reasons,
+      reasons: uniqueReasons(
+        needsReview.flatMap((result) => result.reasons)
+      ),
     };
   }
+
+  if (results.some((result) => result.status === "need_approval")) {
+    return {
+      status: "need_approval",
+      reasons: [
+        "The other prerequisite alternatives have not been satisfied. Instructor or department consent can be used instead.",
+      ],
+    };
+  }
+
+  // None of the alternatives is satisfied.
+  // Do not list every missing alternative as if all were required.
+  const failed = results.some((result) =>
+    result.reasons.some((reason) =>
+      reason.includes("does not have a passing grade")
+    )
+  );
 
   return {
     status: "not_eligible",
     reasons: [
-      "None of the alternative prerequisite courses have been satisfied",
-      ...reasons,
+      failed
+        ? "None of the alternative prerequisite courses have been satisfied with a passing grade."
+        : "None of the alternative prerequisite courses have been satisfied.",
     ],
   };
 }
 
-// Evaluate a prerequisite that may be satisfied through concurrent enrollment.
+// Checks whether a manual-review requirement is mandatory within
+// a concurrent group.
+//
+// For AND, every branch is required, so any manual-review requirement
+// is mandatory.
+//
+// For OR, another branch may be enough, so every branch would need
+// manual review before review is unavoidable.
+function hasMandatoryReview(
+  prerequisite: Prerequisite
+): boolean {
+  switch (prerequisite.type) {
+    case "STANDING":
+    case "REVIEW":
+      return true;
+
+    case "AND":
+      return prerequisite.requirements.some(hasMandatoryReview);
+
+    case "OR":
+      return prerequisite.requirements.every(hasMandatoryReview);
+
+    case "CONCURRENT":
+      return hasMandatoryReview(prerequisite.requirement);
+
+    default:
+      return false;
+  }
+}
+
 function evaluateConcurrent(
   requirement: Prerequisite,
   transcript: TranscriptCourse[]
 ): EligibilityResult {
   const result = evaluatePrerequisite(requirement, transcript);
 
-  // A completed prerequisite already satisfies the requirement.
   if (result.status === "eligible") {
     return result;
   }
 
-  // An in-progress prerequisite can satisfy a concurrent requirement.
   if (result.status === "pending") {
+    if (hasMandatoryReview(requirement)) {
+      return {
+        status: "needs_review",
+        reasons: [
+          ...result.reasons,
+          "Concurrent enrollment may be permitted, but another requirement in this group must be manually verified",
+        ],
+      };
+    }
+
     return {
       status: "eligible",
       reasons: [
@@ -233,7 +302,17 @@ function evaluateConcurrent(
     };
   }
 
-  // Missing or uncertain courses cannot automatically count as satisfied.
+  // A failed course cannot automatically be waived by concurrent enrollment.
+  if (
+    result.status === "not_eligible" &&
+    result.reasons.some((reason) =>
+      reason.includes("does not have a passing grade")
+    )
+  ) {
+    return result;
+  }
+
+  // Missing or uncertain prerequisites need manual confirmation.
   return {
     status: "needs_review",
     reasons: [
@@ -243,7 +322,6 @@ function evaluateConcurrent(
   };
 }
 
-// Recursively evaluate the prerequisite tree.
 function evaluatePrerequisite(
   prerequisite: Prerequisite,
   transcript: TranscriptCourse[]
@@ -258,10 +336,8 @@ function evaluatePrerequisite(
 
     case "CONSENT":
       return {
-        status: "not_eligible",
-        reasons: [
-          "Instructor consent is an exception and does not automatically satisfy the prerequisite",
-        ],
+        status: "need_approval",
+        reasons: ["Instructor or department consent is required"],
       };
 
     case "NO_REQUIREMENT":
@@ -308,7 +384,6 @@ function evaluatePrerequisite(
   }
 }
 
-// Main function used by the rest of the application.
 export function checkEligibility(
   prerequisite: Prerequisite,
   transcript: TranscriptCourse[]

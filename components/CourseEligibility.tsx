@@ -10,10 +10,23 @@ import {
   type EligibilityResult,
 } from "@/lib/eligibilityChecker";
 
+const PASSING_GRADES = new Set([
+  "A+",
+  "A",
+  "A-",
+  "B+",
+  "B",
+  "B-",
+  "C+",
+  "C",
+]);
+
 export default function CourseEligibility() {
   const { courses, loading, error } = useCourses();
 
-  const [transcript, setTranscript] = useState<TranscriptCourse[] | null>(null);
+  const [transcript, setTranscript] = useState<TranscriptCourse[] | null>(
+    null
+  );
   const [transcriptLoading, setTranscriptLoading] = useState(true);
   const [transcriptError, setTranscriptError] = useState("");
 
@@ -28,6 +41,7 @@ export default function CourseEligibility() {
         }
 
         const transcriptData = await response.json();
+
         setTranscript(transcriptData.courses as TranscriptCourse[]);
       } catch (err) {
         setTranscriptError(
@@ -54,7 +68,7 @@ export default function CourseEligibility() {
     }
   }, [error, transcriptError]);
 
-  // Calculate eligibility
+  // Calculate eligibility and remove already-completed courses
   useEffect(() => {
     if (
       loading ||
@@ -71,9 +85,39 @@ export default function CourseEligibility() {
       return;
     }
 
+    // Identify courses the student has already passed.
+    const completedCourseKeys = new Set(
+      transcript
+        .filter((course) => {
+          const grade = course.grade?.trim().toUpperCase();
+
+          return (
+            course.status?.toLowerCase() === "completed" &&
+            grade !== undefined &&
+            PASSING_GRADES.has(grade)
+          );
+        })
+        .map(
+          (course) =>
+            `${course.subject.trim().toUpperCase()}-${course.courseNumber
+              .trim()
+              .toUpperCase()}`
+        )
+    );
+
+    // Remove every section of courses already passed.
+    const remainingCourses = courses.filter((course) => {
+      const key = `${course.subject.trim().toUpperCase()}-${course.courseNumber
+        .trim()
+        .toUpperCase()}`;
+
+      return !completedCourseKeys.has(key);
+    });
+
     const eligibilityByCourse = new Map<string, EligibilityResult>();
 
-    for (const course of courses) {
+    // Evaluate each unique course only once.
+    for (const course of remainingCourses) {
       const key = `${course.subject.toUpperCase()}-${course.courseNumber.toUpperCase()}`;
 
       if (eligibilityByCourse.has(key)) continue;
@@ -106,7 +150,8 @@ export default function CourseEligibility() {
       eligibilityByCourse.set(key, result);
     }
 
-    const coursesWithEligibility = courses.map((course) => {
+    // Attach eligibility results to the remaining sections.
+    const coursesWithEligibility = remainingCourses.map((course) => {
       const key = `${course.subject.toUpperCase()}-${course.courseNumber.toUpperCase()}`;
 
       return {
@@ -123,10 +168,12 @@ export default function CourseEligibility() {
       courses: coursesWithEligibility,
       needsReview,
     };
-    
+
     console.log(JSON.stringify(output, null, 2));
 
     console.log("Course sections retrieved:", courses.length);
+    console.log("Already completed courses removed:", completedCourseKeys.size);
+    console.log("Remaining course sections:", remainingCourses.length);
     console.log("Unique courses evaluated:", eligibilityByCourse.size);
     console.log("Courses needing review:", needsReview.length);
   }, [
