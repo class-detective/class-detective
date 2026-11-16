@@ -120,9 +120,11 @@ function checkCourse(
 }
 
 // Combine results for AND requirements.
+
 function combineAnd(
   results: EligibilityResult[]
 ): EligibilityResult {
+  // A missing or failed required prerequisite takes priority.
   if (results.some((result) => result.status === "not_eligible")) {
     return {
       status: "not_eligible",
@@ -134,9 +136,10 @@ function combineAnd(
     };
   }
 
-  if (results.some((result) => result.status === "needs_review")) {
+  // An in-progress prerequisite makes the overall result pending.
+  if (results.some((result) => result.status === "pending")) {
     return {
-      status: "needs_review",
+      status: "pending",
       reasons: uniqueReasons(
         results
           .filter((result) => result.status !== "eligible")
@@ -145,9 +148,10 @@ function combineAnd(
     };
   }
 
-  if (results.some((result) => result.status === "pending")) {
+  // Only use needs_review when no required course is missing or pending.
+  if (results.some((result) => result.status === "needs_review")) {
     return {
-      status: "pending",
+      status: "needs_review",
       reasons: uniqueReasons(
         results
           .filter((result) => result.status !== "eligible")
@@ -161,6 +165,7 @@ function combineAnd(
     reasons: ["All required courses have been completed successfully"],
   };
 }
+
 
 // Combine results for OR requirements.
 function combineOr(
@@ -188,7 +193,7 @@ function combineOr(
     };
   }
 
-  // Consent or another uncertain alternative needs review.
+  // An uncertain alternative still requires manual review.
   if (results.some((result) => result.status === "needs_review")) {
     return {
       status: "needs_review",
@@ -253,8 +258,10 @@ function evaluatePrerequisite(
 
     case "CONSENT":
       return {
-        status: "needs_review",
-        reasons: ["Instructor consent may be required"],
+        status: "not_eligible",
+        reasons: [
+          "Instructor consent is an exception and does not automatically satisfy the prerequisite",
+        ],
       };
 
     case "NO_REQUIREMENT":
