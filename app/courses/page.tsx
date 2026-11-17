@@ -1,8 +1,10 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import useCourses from "@/components/useCourses";
+import { courseHref } from "@/lib/courseInfo";
 import {
   formatCredits,
   groupSections,
@@ -173,6 +175,12 @@ function CourseRow({
       {open && (
         <div id={panelId} className="border-t border-[#e4ece7] bg-[#fbfdfb] px-5 py-4 sm:px-6">
           <SectionTable sections={course.sections} />
+          <Link
+            href={courseHref(course.subject, course.courseNumber)}
+            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#123f35] px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[#0b3029] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#278447]"
+          >
+            View course details <span aria-hidden="true">→</span>
+          </Link>
         </div>
       )}
     </li>
