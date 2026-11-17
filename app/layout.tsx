@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Suspense } from "react";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 
@@ -25,7 +26,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-screen min-h-dvh flex-col">
-        <Navbar />
+        {/* Navbar reads the URL (usePathname), which needs a Suspense
+            boundary on pages with a dynamic segment like /courses/[courseKey]. */}
+        <Suspense
+          fallback={<div aria-hidden="true" className="h-[81px] border-b border-white/10 bg-[#0a2d26]" />}
+        >
+          <Navbar />
+        </Suspense>
         {children}
       </body>
     </html>
