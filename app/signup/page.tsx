@@ -8,14 +8,15 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formError, setFormError] = useState("");
-  const [showDemoMessage, setShowDemoMessage] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   function clearFeedback() {
     setFormError("");
-    setShowDemoMessage(false);
+    setSuccessMessage("");
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const formData = new FormData(event.currentTarget);
@@ -26,18 +27,39 @@ export default function SignupPage() {
 
     if (email.toLowerCase() !== confirmEmail.toLowerCase()) {
       setFormError("Email addresses do not match.");
-      setShowDemoMessage(false);
+      setSuccessMessage("");
       return;
     }
 
     if (password !== confirmPassword) {
       setFormError("Passwords do not match.");
-      setShowDemoMessage(false);
+      setSuccessMessage("");
       return;
     }
 
     setFormError("");
-    setShowDemoMessage(true);
+    setSuccessMessage("");
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const result: { error?: string } = await response.json();
+
+      if (!response.ok) {
+        setFormError(result.error || "Unable to create your account. Please try again.");
+        return;
+      }
+
+      setSuccessMessage("Your account has been created.");
+    } catch {
+      setFormError("Unable to create your account right now. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -101,6 +123,7 @@ export default function SignupPage() {
                   type="email"
                   autoComplete="email"
                   required
+                  maxLength={254}
                   placeholder="email@example.com"
                   onChange={clearFeedback}
                   className="block h-14 w-full rounded-xl border border-[#bfcec5] bg-[#fbfdfb] py-3 pl-12 pr-4 text-base text-[#17382e] outline-none transition-colors placeholder:text-[#82968c] focus:border-[#278447] focus:ring-2 focus:ring-[#278447]/20"
@@ -126,6 +149,7 @@ export default function SignupPage() {
                   type="email"
                   autoComplete="email"
                   required
+                  maxLength={254}
                   placeholder="Re-enter your email"
                   onChange={clearFeedback}
                   className="block h-14 w-full rounded-xl border border-[#bfcec5] bg-[#fbfdfb] py-3 pl-12 pr-4 text-base text-[#17382e] outline-none transition-colors placeholder:text-[#82968c] focus:border-[#278447] focus:ring-2 focus:ring-[#278447]/20"
@@ -151,6 +175,8 @@ export default function SignupPage() {
                   type={showPassword ? "text" : "password"}
                   autoComplete="new-password"
                   required
+                  minLength={8}
+                  maxLength={128}
                   placeholder="Create a password"
                   onChange={clearFeedback}
                   className="block h-14 w-full rounded-xl border border-[#bfcec5] bg-[#fbfdfb] py-3 pl-12 pr-20 text-base text-[#17382e] outline-none transition-colors placeholder:text-[#82968c] focus:border-[#278447] focus:ring-2 focus:ring-[#278447]/20"
@@ -185,6 +211,8 @@ export default function SignupPage() {
                   type={showConfirmPassword ? "text" : "password"}
                   autoComplete="new-password"
                   required
+                  minLength={8}
+                  maxLength={128}
                   placeholder="Re-enter your password"
                   onChange={clearFeedback}
                   className="block h-14 w-full rounded-xl border border-[#bfcec5] bg-[#fbfdfb] py-3 pl-12 pr-20 text-base text-[#17382e] outline-none transition-colors placeholder:text-[#82968c] focus:border-[#278447] focus:ring-2 focus:ring-[#278447]/20"
@@ -203,9 +231,10 @@ export default function SignupPage() {
 
             <button
               type="submit"
-              className="flex h-14 w-full items-center justify-center rounded-xl bg-[#21833c] px-5 text-base font-bold text-white shadow-sm transition-colors hover:bg-[#176c30] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#21833c]"
+              disabled={isSubmitting}
+              className="flex h-14 w-full items-center justify-center rounded-xl bg-[#21833c] px-5 text-base font-bold text-white shadow-sm transition-colors hover:bg-[#176c30] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#21833c] disabled:cursor-wait disabled:opacity-70"
             >
-              Create account
+              {isSubmitting ? "Creating account..." : "Create account"}
             </button>
 
             {formError && (
@@ -214,9 +243,9 @@ export default function SignupPage() {
               </p>
             )}
 
-            {showDemoMessage && (
+            {successMessage && (
               <p role="status" className="rounded-lg bg-[#eef7ee] px-4 py-3 text-center text-sm leading-relaxed text-[#215735]">
-                This is a front-end preview. Account registration will be added later.
+                {successMessage}
               </p>
             )}
           </form>

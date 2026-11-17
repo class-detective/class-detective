@@ -2,15 +2,44 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
-  const [showDemoMessage, setShowDemoMessage] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setShowDemoMessage(true);
+
+    const formData = new FormData(event.currentTarget);
+    const email = String(formData.get("email") ?? "").trim();
+    const password = String(formData.get("password") ?? "");
+
+    setFormError("");
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const result: { error?: string } = await response.json();
+
+      if (!response.ok) {
+        setFormError(result.error || "Unable to log in. Please try again.");
+        return;
+      }
+
+      router.replace("/");
+    } catch {
+      setFormError("Unable to log in right now. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -75,8 +104,9 @@ export default function LoginPage() {
                   type="email"
                   autoComplete="email"
                   required
+                  maxLength={254}
                   placeholder="email@example.com"
-                  onChange={() => setShowDemoMessage(false)}
+                  onChange={() => setFormError("")}
                   className="block h-14 w-full rounded-xl border border-[#bfcec5] bg-[#fbfdfb] py-3 pl-12 pr-4 text-base text-[#17382e] outline-none transition-colors placeholder:text-[#82968c] focus:border-[#278447] focus:ring-2 focus:ring-[#278447]/20"
                 />
               </div>
@@ -100,8 +130,9 @@ export default function LoginPage() {
                   type={showPassword ? "text" : "password"}
                   autoComplete="current-password"
                   required
+                  maxLength={128}
                   placeholder="Enter your password"
-                  onChange={() => setShowDemoMessage(false)}
+                  onChange={() => setFormError("")}
                   className="block h-14 w-full rounded-xl border border-[#bfcec5] bg-[#fbfdfb] py-3 pl-12 pr-20 text-base text-[#17382e] outline-none transition-colors placeholder:text-[#82968c] focus:border-[#278447] focus:ring-2 focus:ring-[#278447]/20"
                 />
                 <button
@@ -118,14 +149,15 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              className="flex h-14 w-full items-center justify-center rounded-xl bg-[#21833c] px-5 text-base font-bold text-white shadow-sm transition-colors hover:bg-[#176c30] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#21833c]"
+              disabled={isSubmitting}
+              className="flex h-14 w-full items-center justify-center rounded-xl bg-[#21833c] px-5 text-base font-bold text-white shadow-sm transition-colors hover:bg-[#176c30] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#21833c] disabled:cursor-wait disabled:opacity-70"
             >
-              Log in
+              {isSubmitting ? "Logging in..." : "Log in"}
             </button>
 
-            {showDemoMessage && (
-              <p role="status" className="rounded-lg bg-[#eef7ee] px-4 py-3 text-center text-sm leading-relaxed text-[#215735]">
-                This is a front-end preview. Account authentication will be added later.
+            {formError && (
+              <p role="alert" className="rounded-lg bg-[#fff2f1] px-4 py-3 text-center text-sm leading-relaxed text-[#9b2828]">
+                {formError}
               </p>
             )}
           </form>
