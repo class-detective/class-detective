@@ -20,6 +20,14 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Student registration
+
+The signup form requires an email address and a password between 8 and 128 characters. Email and password confirmation are checked in the browser; the registration endpoint validates the account details again on the server.
+
+`POST /api/auth/register` creates an account and returns its ID, normalized email, and creation time. Passwords are stored as salted scrypt hashes in `.data/accounts/`, which is excluded from Git. This local file store is suitable for development, not multi-instance or serverless production deployments; use a managed database before deploying registration at scale.
+
+The login form verifies those hashes, creates a random seven-day HTTP-only session cookie, and redirects successful sign-ins to the home page. Session records are stored in `.data/sessions/` and are revoked when the user logs out.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
