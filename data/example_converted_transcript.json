@@ -1,0 +1,301 @@
+{
+  "schemaVersion": "1.0",
+  "student": {
+    "firstName": "John",
+    "lastName": "Doe",
+    "studentId": "77777777"
+  },
+  "institution": "All Campuses and Deg",
+  "courses": [
+    {
+      "term": "Spring 2024",
+      "subject": "ASTR",
+      "courseNumber": "110",
+      "title": "Survey of Astronomy",
+      "level": "UG",
+      "credits": 3,
+      "grade": "C-",
+      "status": "completed"
+    },
+    {
+      "term": "Spring 2024",
+      "subject": "ATMO",
+      "courseNumber": "101L",
+      "title": "Intro to Weather & Climate Lab",
+      "level": "UG",
+      "credits": 1,
+      "grade": "C+",
+      "status": "completed"
+    },
+    {
+      "term": "Fall 2024",
+      "subject": "BIOL",
+      "courseNumber": "350",
+      "title": "Sex Diffs in the Life Cycle",
+      "level": "UG",
+      "credits": 3,
+      "grade": "B+",
+      "status": "completed"
+    },
+    {
+      "term": "Fall 2023",
+      "subject": "BUS",
+      "courseNumber": "250",
+      "title": "Applied Math in Business",
+      "level": "UG",
+      "credits": 3,
+      "grade": "C+",
+      "status": "completed"
+    },
+    {
+      "term": "Spring 2025",
+      "subject": "CHEM",
+      "courseNumber": "161",
+      "title": "General Chemistry I",
+      "level": "UG",
+      "credits": 3,
+      "grade": "B-",
+      "status": "completed"
+    },
+    {
+      "term": "Fall 2025",
+      "subject": "CHEM",
+      "courseNumber": "162",
+      "title": "General Chemistry II",
+      "level": "UG",
+      "credits": 3,
+      "grade": "C",
+      "status": "completed"
+    },
+    {
+      "term": "Fall 2025",
+      "subject": "CHEM",
+      "courseNumber": "162L",
+      "title": "General Chemistry Lab II",
+      "level": "UG",
+      "credits": 1,
+      "grade": "C",
+      "status": "completed"
+    },
+    {
+      "term": "Fall 2023",
+      "subject": "ECON",
+      "courseNumber": "130",
+      "title": "Principles of Microeconomics",
+      "level": "UG",
+      "credits": 3,
+      "grade": "C+",
+      "status": "completed"
+    },
+    {
+      "term": "Spring 2024",
+      "subject": "ECON",
+      "courseNumber": "131",
+      "title": "Principles of Macroeconomics",
+      "level": "UG",
+      "credits": 3,
+      "grade": "C",
+      "status": "completed"
+    },
+    {
+      "term": "Fall 2024",
+      "subject": "ENG",
+      "courseNumber": "100",
+      "title": "Composition I",
+      "level": "UG",
+      "credits": 3,
+      "grade": "B+",
+      "status": "completed"
+    },
+    {
+      "term": "Spring 2024",
+      "subject": "ERTH",
+      "courseNumber": "135",
+      "title": "Nat Disasters & Human History",
+      "level": "UG",
+      "credits": 3,
+      "grade": "B-",
+      "status": "completed"
+    },
+    {
+      "term": "Spring 2024",
+      "subject": "FR",
+      "courseNumber": "101",
+      "title": "Elementary French",
+      "level": "UG",
+      "credits": 3,
+      "grade": "A+",
+      "status": "completed"
+    },
+    {
+      "term": "Fall 2024",
+      "subject": "FR",
+      "courseNumber": "201",
+      "title": "Intermediate French",
+      "level": "UG",
+      "credits": 3,
+      "grade": "A+",
+      "status": "completed"
+    },
+    {
+      "term": "Spring 2025",
+      "subject": "FR",
+      "courseNumber": "202",
+      "title": "Intermediate French",
+      "level": "UG",
+      "credits": 3,
+      "grade": "A",
+      "status": "completed"
+    },
+    {
+      "term": "Fall 2023",
+      "subject": "GEO",
+      "courseNumber": "102",
+      "title": "World Regional Geography",
+      "level": "UG",
+      "credits": 3,
+      "grade": "B-",
+      "status": "completed"
+    },
+    {
+      "term": "Fall 2024",
+      "subject": "ICS",
+      "courseNumber": "111",
+      "title": "Intro to Computer Science I",
+      "level": "UG",
+      "credits": 4,
+      "grade": "B",
+      "status": "completed"
+    },
+    {
+      "term": "Spring 2025",
+      "subject": "ICS",
+      "courseNumber": "211",
+      "title": "Intro to Computer Science II",
+      "level": "UG",
+      "credits": 0,
+      "grade": "F",
+      "status": "completed"
+    },
+    {
+      "term": "Fall 2025",
+      "subject": "ICS",
+      "courseNumber": "212",
+      "title": "Program Structure",
+      "level": "UG",
+      "credits": 3,
+      "grade": "C",
+      "status": "completed"
+    },
+    {
+      "term": "Fall 2025",
+      "subject": "ICS",
+      "courseNumber": "241",
+      "title": "Discrete Mathematics II",
+      "level": "UG",
+      "credits": 3,
+      "grade": "D",
+      "status": "completed"
+    },
+    {
+      "term": "Fall 2026",
+      "subject": "ICS",
+      "courseNumber": "311",
+      "title": "Algorithms",
+      "level": "UG",
+      "credits": 4,
+      "grade": null,
+      "status": "in_progress"
+    },
+    {
+      "term": "Fall 2026",
+      "subject": "ICS",
+      "courseNumber": "314",
+      "title": "Software Engineering I",
+      "level": "UG",
+      "credits": 3,
+      "grade": null,
+      "status": "in_progress"
+    },
+    {
+      "term": "Spring 2026",
+      "subject": "ICS",
+      "courseNumber": "485",
+      "title": "Video Game Design",
+      "level": "UG",
+      "credits": 3,
+      "grade": "B+",
+      "status": "completed"
+    },
+    {
+      "term": "Fall 2025",
+      "subject": "IP",
+      "courseNumber": "364",
+      "title": "Philippine Popular Culture",
+      "level": "UG",
+      "credits": 3,
+      "grade": "A-",
+      "status": "completed"
+    },
+    {
+      "term": "Fall 2024",
+      "subject": "MATH",
+      "courseNumber": "134",
+      "title": "Precalc: Elementary Functions",
+      "level": "UG",
+      "credits": 3,
+      "grade": "B-",
+      "status": "completed"
+    },
+    {
+      "term": "Spring 2025",
+      "subject": "MATH",
+      "courseNumber": "140X",
+      "title": "Precalculus",
+      "level": "UG",
+      "credits": 4,
+      "grade": "B",
+      "status": "completed"
+    },
+    {
+      "term": "Fall 2026",
+      "subject": "MATH",
+      "courseNumber": "372",
+      "title": "Elem Probability & Statistics",
+      "level": "UG",
+      "credits": 3,
+      "grade": null,
+      "status": "in_progress"
+    },
+    {
+      "term": "Fall 2023",
+      "subject": "PHIL",
+      "courseNumber": "213",
+      "title": "Modern Philosophy",
+      "level": "UG",
+      "credits": 3,
+      "grade": "B-",
+      "status": "completed"
+    },
+    {
+      "term": "Fall 2026",
+      "subject": "PHYS",
+      "courseNumber": "272",
+      "title": "General Physics II",
+      "level": "UG",
+      "credits": 3,
+      "grade": null,
+      "status": "in_progress"
+    },
+    {
+      "term": "Fall 2023",
+      "subject": "PSY",
+      "courseNumber": "100",
+      "title": "Survey of Psychology",
+      "level": "UG",
+      "credits": 3,
+      "grade": "A",
+      "status": "completed"
+    }
+  ]
+}
