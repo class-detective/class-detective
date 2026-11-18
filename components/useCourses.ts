@@ -61,7 +61,10 @@ export default function useCourses() {
 
         const courseList = data.map((course) => ({
           ...course,
+
+          // Remove the extra trailing zero returned by the UH endpoint.
           courseNumber: course.courseNumber.replace(/0$/, ""),
+
           attributes: course.attributes ?? [],
           instructors: course.instructors ?? [],
           meetings: course.meetings ?? [],
@@ -76,7 +79,6 @@ export default function useCourses() {
         );
 
         setCourses(courseList);
-
       } catch (err) {
         setError(
           err instanceof Error

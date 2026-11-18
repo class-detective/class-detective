@@ -3,8 +3,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import useCourses from "@/components/useCourses";
-import { useEffect } from "react";
+import CourseEligibility from "@/components/CourseEligibility";
 
 const features = [
   {
@@ -25,22 +24,17 @@ const features = [
 ];
 
 export default function Home() {
-  const { courses, loading, error } = useCourses();
-
-  useEffect(() => {
-    if (!loading && !error) {
-      console.log("UH Courses:", courses);
-    }
-
-    if (error) {
-      console.error("Course retrieval error:", error);
-    }
-  }, [courses, loading, error]);
-
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col bg-[#0b3029] text-white">
+
+      {/* Handle transcript loading and course eligibility */}
+      <CourseEligibility />
+
       <main className="flex flex-1 flex-col">
+
+        {/* Hero Section */}
         <section className="relative isolate flex min-h-[520px] flex-1 items-center overflow-hidden bg-[#123b31] sm:min-h-[570px]">
+
           <Image
             src="/images/campus.jpg"
             alt="University of Hawaiʻi at Mānoa campus building, palms, and rainbow"
@@ -56,7 +50,9 @@ export default function Home() {
           />
 
           <div className="relative z-20 mx-auto w-full max-w-[1800px] px-6 py-20 sm:px-8 lg:px-16 lg:py-24">
+
             <div className="w-full max-w-4xl">
+
               <h1 className="text-4xl font-extrabold leading-[1.12] tracking-tight sm:text-5xl lg:text-6xl xl:text-7xl">
                 Find the classes you&apos;re eligible to take.
               </h1>
@@ -68,6 +64,7 @@ export default function Home() {
               </p>
 
               <div className="mt-9 flex flex-wrap gap-4">
+
                 <Link
                   href="/signup"
                   className="inline-flex min-h-14 items-center justify-center gap-3 rounded-xl bg-[#a3ee95] px-7 py-3 text-base font-bold text-[#082b23] transition-colors hover:bg-[#bef9b2] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white sm:text-lg"
@@ -81,17 +78,20 @@ export default function Home() {
                 >
                   Learn More
                 </Link>
+
               </div>
             </div>
           </div>
         </section>
 
+        {/* Features Section */}
         <section
           id="features"
           aria-label="Class Detective features"
           className="bg-[#123f35] scroll-mt-4"
         >
           <div className="grid w-full gap-0 px-6 py-8 md:grid-cols-3 md:px-8 lg:px-12 lg:py-10 xl:px-20">
+
             {features.map((feature, index) => (
               <div
                 key={feature.title}
@@ -101,6 +101,7 @@ export default function Home() {
                     : ""
                 }`}
               >
+
                 <Image
                   src={feature.icon}
                   alt=""
@@ -118,10 +119,13 @@ export default function Home() {
                     {feature.description}
                   </p>
                 </div>
+
               </div>
             ))}
+
           </div>
         </section>
+
       </main>
     </div>
   );
