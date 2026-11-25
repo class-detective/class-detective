@@ -11,6 +11,8 @@ import { join } from "node:path";
 type StoredAccount = {
   id: string;
   email: string;
+  fullName?: string;
+  major?: string;
   passwordHash: string;
   passwordSalt: string;
   createdAt: string;
@@ -38,6 +40,8 @@ function isStoredAccount(value: unknown): value is StoredAccount {
   return (
     typeof account.id === "string" &&
     typeof account.email === "string" &&
+    (account.fullName === undefined || typeof account.fullName === "string") &&
+    (account.major === undefined || typeof account.major === "string") &&
     typeof account.passwordHash === "string" &&
     /^[\da-f]{128}$/i.test(account.passwordHash) &&
     typeof account.passwordSalt === "string" &&
@@ -78,7 +82,9 @@ async function findAccount(email: string): Promise<StoredAccount | null> {
 
 export async function registerAccount(
   email: string,
-  password: string
+  password: string,
+  fullName: string,
+  major: string
 ): Promise<StoredAccount | null> {
   const accountsDirectory = join(process.cwd(), ".data", "accounts");
   await mkdir(accountsDirectory, { recursive: true });
@@ -88,6 +94,8 @@ export async function registerAccount(
   const account: StoredAccount = {
     id: randomUUID(),
     email,
+    fullName,
+    major,
     passwordHash: passwordHash.toString("hex"),
     passwordSalt: passwordSalt.toString("hex"),
     createdAt: new Date().toISOString(),
@@ -132,4 +140,22 @@ export async function verifyAccountCredentials(
   }
 
   return { id: account.id, email: account.email };
+}
+
+export async function getAccountProfile(email: string): Promise<{
+  id: string;
+  email: string;
+  fullName: string | null;
+  major: string | null;
+} | null> {
+  const account = await findAccount(email);
+
+  if (!account) return null;
+
+  return {
+    id: account.id,
+    email: account.email,
+    fullName: account.fullName ?? null,
+    major: account.major ?? null,
+  };
 }

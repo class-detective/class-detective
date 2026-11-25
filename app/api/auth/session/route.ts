@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getAccountProfile } from "@/lib/accounts";
 import {
   clearSessionCookie,
   getSessionToken,
@@ -17,8 +18,17 @@ export async function GET(request: Request) {
       );
     }
 
+    const account = await getAccountProfile(session.email);
+
+    if (!account || account.id !== session.userId) {
+      return NextResponse.json(
+        { error: "Not signed in." },
+        { status: 401, headers: { "Cache-Control": "no-store" } }
+      );
+    }
+
     return NextResponse.json(
-      { user: { id: session.userId, email: session.email } },
+      { user: account },
       { headers: { "Cache-Control": "no-store" } }
     );
   } catch (error) {

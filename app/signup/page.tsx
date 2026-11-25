@@ -2,50 +2,60 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { MAJORS } from "@/lib/majors";
 import { useState, type FormEvent } from "react";
 
 export default function SignupPage() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formError, setFormError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   function clearFeedback() {
     setFormError("");
-    setSuccessMessage("");
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const formData = new FormData(event.currentTarget);
+    const fullName = String(formData.get("fullName") ?? "").trim().replace(/\s+/g, " ");
+    const major = String(formData.get("major") ?? "");
     const email = String(formData.get("email") ?? "").trim();
     const confirmEmail = String(formData.get("confirmEmail") ?? "").trim();
     const password = String(formData.get("password") ?? "");
     const confirmPassword = String(formData.get("confirmPassword") ?? "");
 
+    if (fullName.length < 2 || fullName.length > 100) {
+      setFormError("Enter your full name (2–100 characters).");
+      return;
+    }
+
+    if (!MAJORS.includes(major)) {
+      setFormError("Select your major.");
+      return;
+    }
+
     if (email.toLowerCase() !== confirmEmail.toLowerCase()) {
       setFormError("Email addresses do not match.");
-      setSuccessMessage("");
-      return;
+        return;
     }
 
     if (password !== confirmPassword) {
       setFormError("Passwords do not match.");
-      setSuccessMessage("");
-      return;
+        return;
     }
 
     setFormError("");
-    setSuccessMessage("");
     setIsSubmitting(true);
 
     try {
       const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ fullName, major, email, password }),
       });
       const result: { error?: string } = await response.json();
 
@@ -54,7 +64,7 @@ export default function SignupPage() {
         return;
       }
 
-      setSuccessMessage("Your account has been created.");
+      router.replace("/dashboard");
     } catch {
       setFormError("Unable to create your account right now. Please try again.");
     } finally {
@@ -105,6 +115,43 @@ export default function SignupPage() {
 
         <div className="rounded-[22px] border border-[#dbe6df] bg-white px-6 py-8 shadow-[0_18px_55px_rgba(24,63,46,0.10)] sm:px-10 sm:py-10">
           <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label htmlFor="signup-full-name" className="mb-2 block text-sm font-bold text-[#17382e]">
+                Full Name
+              </label>
+              <input
+                id="signup-full-name"
+                name="fullName"
+                type="text"
+                autoComplete="name"
+                required
+                minLength={2}
+                maxLength={100}
+                placeholder="Enter your full name"
+                onChange={clearFeedback}
+                className="block h-14 w-full rounded-xl border border-[#bfcec5] bg-[#fbfdfb] px-4 py-3 text-base text-[#17382e] outline-none transition-colors placeholder:text-[#82968c] focus:border-[#278447] focus:ring-2 focus:ring-[#278447]/20"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="signup-major" className="mb-2 block text-sm font-bold text-[#17382e]">
+                Major
+              </label>
+              <select
+                id="signup-major"
+                name="major"
+                required
+                defaultValue=""
+                onChange={clearFeedback}
+                className="block h-14 w-full rounded-xl border border-[#bfcec5] bg-[#fbfdfb] px-4 py-3 text-base text-[#17382e] outline-none transition-colors focus:border-[#278447] focus:ring-2 focus:ring-[#278447]/20"
+              >
+                <option value="" disabled>Select your major</option>
+                {MAJORS.map((major) => (
+                  <option key={major} value={major}>{major}</option>
+                ))}
+              </select>
+            </div>
+
             <div>
               <label htmlFor="signup-email" className="mb-2 block text-sm font-bold text-[#17382e]">
                 Email
@@ -243,11 +290,6 @@ export default function SignupPage() {
               </p>
             )}
 
-            {successMessage && (
-              <p role="status" className="rounded-lg bg-[#eef7ee] px-4 py-3 text-center text-sm leading-relaxed text-[#215735]">
-                {successMessage}
-              </p>
-            )}
           </form>
 
           <p className="mt-7 text-center text-sm text-[#526d61] sm:text-base">
