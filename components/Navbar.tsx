@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 type AuthState =
@@ -26,6 +26,7 @@ function getSessionEmail(value: unknown): string | null {
 
 export default function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [authState, setAuthState] = useState<AuthState>({ status: "loading" });
 
   useEffect(() => {
@@ -94,12 +95,19 @@ export default function Navbar() {
         </Link>
 
         <div className="order-3 flex w-full items-center justify-center gap-6 text-sm font-semibold sm:gap-9 sm:text-base lg:order-2 lg:w-auto">
-          <Link href="/" aria-current={isActive("/") ? "page" : undefined} className={navLinkClass("/")}>
-            Home
-          </Link>
           <Link href="/courses" aria-current={isActive("/courses") ? "page" : undefined} className={navLinkClass("/courses")}>
             Courses
           </Link>
+          {authState.status === "signedIn" && (
+            <>
+              <Link href="/planner" aria-current={isActive("/planner") ? "page" : undefined} className={navLinkClass("/planner")}>
+                Planner
+              </Link>
+              <Link href="/friends" aria-current={isActive("/friends") ? "page" : undefined} className={navLinkClass("/friends")}>
+                Friends
+              </Link>
+            </>
+          )}
           <Link href="/about" aria-current={isActive("/about") ? "page" : undefined} className={navLinkClass("/about")}>
             About
           </Link>
@@ -108,9 +116,13 @@ export default function Navbar() {
         <div className="order-2 ml-auto flex items-center gap-2 text-sm font-semibold sm:gap-3 lg:order-3">
           {authState.status === "signedIn" ? (
             <>
-              <span title={authState.email} className="hidden max-w-[220px] truncate text-white/85 sm:inline">
-                {authState.email}
-              </span>
+              <Link
+                href="/dashboard"
+                aria-current={isActive("/dashboard") ? "page" : undefined}
+                className="rounded-lg bg-[#a3ee95] px-4 py-2.5 text-[#082b23] transition-colors hover:bg-[#bef9b2] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              >
+                Dashboard
+              </Link>
               <button
                 type="button"
                 onClick={async () => {
@@ -122,6 +134,7 @@ export default function Navbar() {
                     }
 
                     setAuthState({ status: "signedOut" });
+                    router.replace("/");
                   } catch (error) {
                     console.error("Unable to log out student account:", error);
                     setAuthState({ status: "error" });
