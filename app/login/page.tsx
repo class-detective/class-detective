@@ -14,7 +14,8 @@ export default function LoginPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const formData = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
     const email = String(formData.get("email") ?? "").trim();
     const password = String(formData.get("password") ?? "");
 
@@ -34,6 +35,8 @@ export default function LoginPage() {
         return;
       }
 
+      form.reset();
+      setShowPassword(false);
       router.replace("/");
     } catch {
       setFormError("Unable to log in right now. Please try again.");
