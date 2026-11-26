@@ -241,6 +241,25 @@ export async function GET(request: Request) {
       const course = courseMap.get(crn) || {};
       const description = descriptionMap.get(crn) || {};
 
+      const enrolled = Number(section.enrl);
+      const totalCredits = Number(section.totCreditHrs);
+
+      const inferredCredits =
+        section.creditHrs == null &&
+        enrolled > 0 &&
+        Number.isFinite(totalCredits)
+          ? totalCredits / enrolled
+          : null;
+
+      const credits =
+        section.creditHrs ??
+        (inferredCredits !== null &&
+        Number.isInteger(inferredCredits) &&
+        inferredCredits >= 1 &&
+        inferredCredits <= 6
+          ? inferredCredits
+          : null);
+
       return {
         subject: getString(section, "subjCode", "ssbsectSubjCode"),
         courseNumber: getString(section, "crseNumb", "ssbsectCrseNumb"),
@@ -250,10 +269,7 @@ export async function GET(request: Request) {
         crn,
         section: getString(section, "seqNumb", "ssbsectSeqNumb"),
 
-        credits:
-          section.creditHrs ??
-          section.totCreditHrs ??
-          null,
+        credits,
 
         attributes: attributeMap.get(crn) || [],
         instructors: instructorMap.get(crn) || [],
