@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { FriendServiceError, relationshipFor, type FriendAction, type FriendLookup, type FriendSnapshot, type Student } from "./friendData";
 import { createFriendService } from "./friendService";
@@ -9,7 +10,7 @@ const primary = "disabled:cursor-not-allowed disabled:opacity-50 inline-flex ite
 const secondary = "disabled:cursor-not-allowed disabled:opacity-50 inline-flex items-center justify-center gap-2 rounded-xl border border-[#b7cdbd] px-4 py-2.5 text-sm font-semibold text-[#215735] transition hover:bg-[#edf5ee] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#21833c]";
 const danger = "disabled:cursor-not-allowed disabled:opacity-50 rounded-lg px-2 py-1.5 text-sm font-semibold text-[#a33d3d] transition hover:bg-[#fff0f0] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#a33d3d]";
 
-type IconName = "copy" | "search" | "users" | "userPlus" | "trash" | "x" | "lock";
+type IconName = "copy" | "search" | "users" | "userPlus" | "trash" | "x" | "lock" | "chevronRight";
 
 function Icon({ name, className = "h-5 w-5" }: { name: IconName; className?: string }) {
   const paths: Record<IconName, ReactNode> = {
@@ -19,6 +20,7 @@ function Icon({ name, className = "h-5 w-5" }: { name: IconName; className?: str
     userPlus: <><circle cx="9" cy="8" r="3"/><path d="M3 20v-3a5 5 0 0 1 5-5h2a5 5 0 0 1 5 5v3M19 7v8m-4-4h8"/></>,
     trash: <path d="M3 6h18M9 6V4h6v2M5 6l1 14h12l1-14M10 10v6M14 10v6"/>,
     x: <path d="m6 6 12 12M18 6 6 18"/>,
+    chevronRight: <path d="m9 18 6-6-6-6"/>,
     lock: <><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></>,
   };
   return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className={className}>{paths[name]}</svg>;
@@ -203,12 +205,6 @@ export default function FriendsContent() {
     }
   }
 
-  const stats = [
-    { label: "Your friends", value: friends.length, icon: "users" as const },
-    { label: "Incoming requests", value: incoming.length, icon: "userPlus" as const },
-    { label: "Sent requests", value: outgoing.length, icon: "userPlus" as const },
-  ];
-
   return (
     <main className="w-full flex-1 bg-[#f0f6f1] text-[#102e25]">
       <div className="mx-auto max-w-6xl px-5 py-9 sm:px-8 sm:py-12 lg:px-12">
@@ -262,22 +258,25 @@ export default function FriendsContent() {
           {message && <><span>{message}</span><button aria-label="Dismiss message" type="button" onClick={() => setMessage("")} className="shrink-0 rounded p-1 hover:bg-[#d4e8d8]"><Icon name="x"/></button></>}
         </div>
         {actionError && <div role="alert" className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#fecaca] bg-[#fff0f0] px-4 py-3 text-sm text-[#991b1b]"><span>{actionError}</span><button type="button" disabled={busy} onClick={refreshFriends} className={secondary}>Refresh friends</button></div>}
-        <div className="my-5 grid gap-3 sm:grid-cols-3">
-          {stats.map((stat) => <div key={stat.label} className="flex items-center gap-4 rounded-2xl border border-[#d4e2d7] bg-white p-4 shadow-sm sm:p-5"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#e4f3e6] text-[#368454]"><Icon name={stat.icon} className="h-6 w-6"/></div><div><p className="text-sm text-[#516f62]">{stat.label}</p><p className="mt-1 text-2xl font-extrabold">{stat.value}</p></div></div>)}
-        </div>
-        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="mt-5 grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
           <section className={panel} aria-labelledby="friends-heading">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 ref={friendsHeading} tabIndex={-1} id="friends-heading" className="text-xl font-bold text-[#17382e]">Friends</h2>
+                <h2 ref={friendsHeading} tabIndex={-1} id="friends-heading" className="flex items-center gap-2 text-xl font-bold text-[#17382e]">Friends <span aria-label={`${friends.length} ${friends.length === 1 ? "friend" : "friends"}`} className="rounded-full bg-[#e4f3e6] px-2.5 py-1 text-xs font-bold tabular-nums text-[#215735]">{friends.length}</span></h2>
                 <p className="mt-2 text-sm text-[#516f62]">Manage the people you've connected with.</p>
               </div>
               <button type="button" onClick={chooseFriendToRemove} disabled={busy || friends.length === 0} className={`${secondary} disabled:cursor-not-allowed disabled:opacity-50`}>Remove friend</button>
             </div>
             {friends.length === 0 ? <div className="mt-5"><EmptyState icon="users" title="No friends yet" description="Enter a friend code or accept a friend request to get started."/></div> : <ul className="mt-5 space-y-3">
               {friends.map((student) => (
-                <li key={student.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#d4e2d7] bg-white p-4">
-                  <StudentIdentity student={student}/>
+                <li key={student.id}>
+                  <Link href={`/friends/${encodeURIComponent(student.id)}`} aria-label={`View ${student.name}'s friend page`} className="group flex items-center justify-between gap-3 rounded-xl border border-[#d4e2d7] bg-white p-4 transition hover:border-[#a8c5ae] hover:bg-[#f5f9f5] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#21833c]">
+                    <StudentIdentity student={student}/>
+                    <span className="flex shrink-0 items-center gap-1 text-sm font-semibold text-[#215735]">
+                      <span className="hidden sm:inline">View friend</span>
+                      <Icon name="chevronRight" className="h-5 w-5 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none"/>
+                    </span>
+                  </Link>
                 </li>
               ))}
             </ul>}
