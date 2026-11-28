@@ -1,24 +1,26 @@
-const assert = require("node:assert/strict");
-const { test, after } = require("node:test");
-const { mkdtempSync, rmSync } = require("node:fs");
-const { tmpdir } = require("node:os");
-const { join, resolve, dirname } = require("node:path");
-const { execFileSync } = require("node:child_process");
+import assert from "node:assert/strict";
+import { test, after } from "node:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve, dirname } from "node:path";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const out = mkdtempSync(join(tmpdir(), "class-detective-friend-plans-"));
-const base = resolve(__dirname, "../app/friends/[id]");
+const base = resolve(dirname(fileURLToPath(import.meta.url)), "../app/friends/[id]");
 try {
-  execFileSync(process.execPath, [require.resolve("typescript/bin/tsc"), "--strict", "--skipLibCheck", "--target", "ES2022", "--module", "commonjs", "--typeRoots", dirname(dirname(require.resolve("@types/node/package.json"))), "--outDir", out, ...["comparison.ts", "friendPlanService.ts", "mockFriendPlanService.ts", "planAdapter.ts", "previewData.ts", "friendPlanLoader.ts", "friendPlanClient.ts"].map(f => join(base, f))], { stdio: "inherit" });
+  execFileSync(process.execPath, [fileURLToPath(import.meta.resolve("typescript/bin/tsc")), "--strict", "--skipLibCheck", "--target", "ES2022", "--module", "commonjs", "--typeRoots", dirname(dirname(fileURLToPath(import.meta.resolve("@types/node/package.json")))), "--outDir", out, ...["comparison.ts", "friendPlanService.ts", "mockFriendPlanService.ts", "planAdapter.ts", "previewData.ts", "friendPlanLoader.ts", "friendPlanClient.ts"].map(f => join(base, f))], { stdio: "inherit" });
 } catch (error) {
   rmSync(out, { recursive: true, force: true });
   throw error;
 }
 after(() => rmSync(out, { recursive: true, force: true }));
-const { sameSection, alignCourses, buildComparison, sharedGaps } = require(join(out, "comparison.js"));
-const { sortedSemesters, preferredSemester, comparisonSemesters, friendRouteKey, resolveFriendRouteKey } = require(join(out, "friendPlanService.js"));
-const { createMockFriendPlanService } = require(join(out, "mockFriendPlanService.js"));
-const { adaptPlannerSemester, adaptPlannerPlans, adaptMeeting, parseMeetingTime, plannerTermCode } = require(join(out, "planAdapter.js"));
-const { getFriendPreview } = require(join(out, "previewData.js"));
+const loadModule = async file => (await import(pathToFileURL(join(out, file)).href)).default;
+const { sameSection, alignCourses, buildComparison, sharedGaps } = await loadModule("comparison.js");
+const { sortedSemesters, preferredSemester, comparisonSemesters, friendRouteKey, resolveFriendRouteKey } = await loadModule("friendPlanService.js");
+const { createMockFriendPlanService } = await loadModule("mockFriendPlanService.js");
+const { adaptPlannerSemester, adaptPlannerPlans, adaptMeeting, parseMeetingTime, plannerTermCode } = await loadModule("planAdapter.js");
+const { getFriendPreview } = await loadModule("previewData.js");
 
 const course = (code, sectionId, start, end, day = "Mon") => ({ code, name: code, sectionId, meetings: start === undefined ? [] : [{ day, start, end }] });
 const own = [course("ICS 311", "a", 540, 600), course("ICS 321", "b", 780, 840)];
@@ -137,8 +139,8 @@ test("failed requests do not update permissions; returned data is isolated", asy
 test("production never loads fictional profiles or permits simulated sharing", async () => {
   const before = process.env.NODE_ENV;
   try {
-    const { loadFriendPlans } = require(join(out, "friendPlanLoader.js"));
-    const { createFriendPlanService } = require(join(out, "friendPlanClient.js"));
+    const { loadFriendPlans } = await loadModule("friendPlanLoader.js");
+    const { createFriendPlanService } = await loadModule("friendPlanClient.js");
     process.env.NODE_ENV = "production";
     assert.equal(await loadFriendPlans("viewer", "alex"), null);
     await assert.rejects(createFriendPlanService(snapshot).sharePlan("alpha", "Spring 2027"));
